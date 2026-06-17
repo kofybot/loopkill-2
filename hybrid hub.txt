@@ -1,0 +1,690 @@
+﻿-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Player = Players.LocalPlayer
+
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KilasikMultiToolGUI_V2"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Função Auxiliar para Cantos Arredondados
+local function AddUICorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 6)
+    corner.Parent = parent
+    return corner
+end
+
+-- Função Auxiliar para Aplicar o Gradiente nos Textos
+local function ApplyTextGradient(textObject)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 200, 255)), -- Azul Claro
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))    -- Vermelho
+    })
+    gradient.Parent = textObject
+    textObject.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+-- Função União de Arrasto Suave (Resolve problemas de sobreposição de botões)
+local function MakeDraggable(dragHandle, objectToMove)
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = objectToMove.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseBehavior or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            objectToMove.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Main Frame (320x320)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+-- Borda com Gradiente para a HUD Principal
+local MainFrameStroke = Instance.new("UIStroke")
+MainFrameStroke.Color = Color3.fromRGB(255, 255, 255)
+MainFrameStroke.Thickness = 2
+MainFrameStroke.Parent = MainFrame
+
+local MainFrameGradient = Instance.new("UIGradient")
+MainFrameGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 200, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))
+})
+MainFrameGradient.Parent = MainFrameStroke
+
+-- Title Bar (Alça de Arrasto)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Active = true
+TitleBar.Parent = MainFrame
+
+local Fill = Instance.new("Frame")
+Fill.Size = UDim2.new(1, 0, 0, 10)
+Fill.Position = UDim2.new(0, 0, 1, -10)
+Fill.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+Fill.BorderSizePixel = 0
+Fill.Parent = TitleBar
+
+-- Aplica o Arrasto na Barra Superior da Interface
+MakeDraggable(TitleBar, MainFrame)
+
+-- Title Text
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -75, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "HYBRID"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+ApplyTextGradient(Title)
+
+-- Close Button (×)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Position = UDim2.new(1, -35, 0, 8)
+CloseButton.Size = UDim2.new(0, 24, 0, 24)
+CloseButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+CloseButton.BorderSizePixel = 0
+CloseButton.Text = "×"
+CloseButton.TextColor3 = Color3.fromRGB(180, 180, 190)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 18
+CloseButton.ZIndex = 3
+CloseButton.Parent = TitleBar
+AddUICorner(CloseButton, 6)
+
+-- Minimize Button (~)
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Position = UDim2.new(1, -65, 0, 8)
+MinimizeButton.Size = UDim2.new(0, 24, 0, 24)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Text = "~"
+MinimizeButton.TextColor3 = Color3.fromRGB(180, 180, 190)
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 16
+MinimizeButton.ZIndex = 3
+MinimizeButton.Parent = TitleBar
+AddUICorner(MinimizeButton, 6)
+
+-- Botão de Minimizado Móvel (Com Highlight em Gradiente)
+local MinimizedButton = Instance.new("TextButton")
+MinimizedButton.Size = UDim2.new(0, 45, 0, 45)
+MinimizedButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+MinimizedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MinimizedButton.BorderSizePixel = 0
+MinimizedButton.Text = "H"
+MinimizedButton.Font = Enum.Font.GothamBold
+MinimizedButton.TextSize = 18
+MinimizedButton.Visible = false
+MinimizedButton.Active = true
+MinimizedButton.Parent = ScreenGui
+ApplyTextGradient(MinimizedButton)
+AddUICorner(MinimizedButton, 8)
+
+-- Torna o botão "H" arrastável nele mesmo
+MakeDraggable(MinimizedButton, MinimizedButton)
+
+local MinimizedStroke = Instance.new("UIStroke")
+MinimizedStroke.Color = Color3.fromRGB(255, 255, 255)
+MinimizedStroke.Thickness = 2
+MinimizedStroke.Parent = MinimizedButton
+
+local MinimizedGradient = Instance.new("UIGradient")
+MinimizedGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 200, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))
+})
+MinimizedGradient.Parent = MinimizedStroke
+
+-- Status Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Position = UDim2.new(0, 15, 0, 50)
+StatusLabel.Size = UDim2.new(1, -75, 0, 24)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "0 jogador(es) na lista"
+StatusLabel.Font = Enum.Font.GothamSemibold
+StatusLabel.TextSize = 12
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = MainFrame
+ApplyTextGradient(StatusLabel)
+
+-- Botão Quadrado Interno (Start/Stop)
+local StateToggleButton = Instance.new("TextButton")
+StateToggleButton.Position = UDim2.new(1, -40, 0, 50)
+StateToggleButton.Size = UDim2.new(0, 24, 0, 24)
+StateToggleButton.BackgroundColor3 = Color3.fromRGB(0, 180, 110)
+StateToggleButton.BorderSizePixel = 0
+StateToggleButton.Text = ""
+StateToggleButton.Parent = MainFrame
+AddUICorner(StateToggleButton, 6)
+
+local ToggleButtonStroke = Instance.new("UIStroke")
+ToggleButtonStroke.Color = Color3.fromRGB(0, 0, 0)
+ToggleButtonStroke.Thickness = 2
+ToggleButtonStroke.Parent = StateToggleButton
+
+-- Player Selection Container
+local SelectionFrame = Instance.new("Frame")
+SelectionFrame.Position = UDim2.new(0, 15, 0, 85)
+SelectionFrame.Size = UDim2.new(1, -30, 0, 180)
+SelectionFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+SelectionFrame.BorderSizePixel = 0
+SelectionFrame.Parent = MainFrame
+AddUICorner(SelectionFrame, 8)
+
+local ListStroke = Instance.new("UIStroke")
+ListStroke.Color = Color3.fromRGB(30, 30, 38)
+ListStroke.Parent = SelectionFrame
+
+-- Player List ScrollFrame
+local PlayerScrollFrame = Instance.new("ScrollingFrame")
+PlayerScrollFrame.Position = UDim2.new(0, 5, 0, 5)
+PlayerScrollFrame.Size = UDim2.new(1, -10, 1, -10)
+PlayerScrollFrame.BackgroundTransparency = 1
+PlayerScrollFrame.BorderSizePixel = 0
+PlayerScrollFrame.ScrollBarThickness = 4
+PlayerScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 65)
+PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayerScrollFrame.Parent = SelectionFrame
+
+-- UI Layout
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = PlayerScrollFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
+
+-- Estilização de Botões
+local function StyleButton(btn, bgColor, fontColor)
+    btn.BackgroundColor3 = bgColor
+    btn.BorderSizePixel = 0
+    btn.TextColor3 = fontColor
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    AddUICorner(btn, 6)
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.15}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+    end)
+end
+
+-- Botão Deselect All
+local DeselectAllButton = Instance.new("TextButton")
+DeselectAllButton.Position = UDim2.new(0, 15, 0, 275)
+DeselectAllButton.Size = UDim2.new(1, -30, 0, 32)
+DeselectAllButton.Text = "DESELECT ALL"
+DeselectAllButton.Parent = MainFrame
+StyleButton(DeselectAllButton, Color3.fromRGB(35, 35, 45), Color3.fromRGB(255, 255, 255))
+ApplyTextGradient(DeselectAllButton)
+
+-- Lógica para Alternar Visibilidade (Minimizar / Restaurar)
+local isDraggingMinimized = false
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MinimizedButton.Position = UDim2.new(0, MainFrame.AbsolutePosition.X + 137, 0, MainFrame.AbsolutePosition.Y + 137)
+    MinimizedButton.Visible = true
+end)
+
+MinimizedButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingMinimized = false
+    end
+end)
+
+MinimizedButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseBehavior or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingMinimized = true
+    end
+end)
+
+MinimizedButton.InputEnded:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDraggingMinimized then
+        if MinimizedButton.Visible then
+            MinimizedButton.Visible = false
+            MainFrame.Visible = true
+        end
+    end
+end)
+
+-- Variáveis de Controle
+local SelectedTargets = {}
+local PlayerCheckboxes = {}
+local loopActive = true
+
+-- Configurações de Cooldown
+local cooldown = 0.95
+local canShoot = true
+local lastShot = tick()
+
+local pencilCooldown = 0.2
+local canShootPencil = true
+local lastPencilShot = tick()
+
+getgenv().OldPos = nil
+getgenv().FPDH = workspace.FallenPartsDestroyHeight
+
+local function CountSelectedTargets()
+    local count = 0
+    for _ in pairs(SelectedTargets) do count = count + 1 end
+    return count
+end
+
+local function UpdateStatus()
+    local count = CountSelectedTargets()
+    if loopActive then
+        StatusLabel.Text = "Destruindo " .. count .. " alvo(s)..."
+    else
+        StatusLabel.Text = count .. " jogador(es) na lista" 
+    end
+end
+
+local function Message(Title, Text, Time)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = Title,
+        Text = Text,
+        Duration = Time or 5
+    })
+end
+
+local function RefreshPlayerList()
+    for _, child in pairs(PlayerScrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    PlayerCheckboxes = {}
+    
+    local PlayerList = Players:GetPlayers()
+    table.sort(PlayerList, function(a, b) return a.DisplayName:lower() < b.DisplayName:lower() end)
+    
+    for _, player in ipairs(PlayerList) do
+        if player ~= Player then
+            local PlayerEntry = Instance.new("Frame")
+            PlayerEntry.Size = UDim2.new(1, 0, 0, 34)
+            PlayerEntry.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+            PlayerEntry.BorderSizePixel = 0
+            PlayerEntry.Parent = PlayerScrollFrame
+            AddUICorner(PlayerEntry, 6)
+            
+            local Checkbox = Instance.new("Frame")
+            Checkbox.Size = UDim2.new(0, 18, 0, 18)
+            Checkbox.Position = UDim2.new(0, 10, 0.5, -9)
+            Checkbox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+            Checkbox.BorderSizePixel = 0
+            Checkbox.Parent = PlayerEntry
+            AddUICorner(Checkbox, 4)
+            
+            local Checkmark = Instance.new("TextLabel")
+            Checkmark.Size = UDim2.new(1, 0, 1, -2)
+            Checkmark.BackgroundTransparency = 1
+            Checkmark.Text = "X"
+            Checkmark.TextSize = 12
+            Checkmark.Font = Enum.Font.GothamBold
+            Checkmark.Visible = SelectedTargets[player.Name] ~= nil
+            Checkmark.Parent = Checkbox
+            ApplyTextGradient(Checkmark)
+            
+            local NameLabel = Instance.new("TextLabel")
+            NameLabel.Size = UDim2.new(1, -45, 1, 0)
+            NameLabel.Position = UDim2.new(0, 38, 0, 0)
+            NameLabel.BackgroundTransparency = 1
+            NameLabel.Text = player.DisplayName
+            NameLabel.TextColor3 = Color3.fromRGB(230, 230, 240)
+            NameLabel.TextSize = 13
+            NameLabel.Font = Enum.Font.GothamMedium
+            NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            NameLabel.Parent = PlayerEntry
+            
+            local ClickArea = Instance.new("TextButton")
+            ClickArea.Size = UDim2.new(1, 0, 1, 0)
+            ClickArea.BackgroundTransparency = 1
+            ClickArea.Text = ""
+            ClickArea.ZIndex = 2
+            ClickArea.Parent = PlayerEntry
+            
+            ClickArea.MouseEnter:Connect(function()
+                TweenService:Create(PlayerEntry, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(38, 38, 48)}):Play()
+            end)
+            ClickArea.MouseLeave:Connect(function()
+                TweenService:Create(PlayerEntry, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 30, 38)}):Play()
+            end)
+            
+            ClickArea.MouseButton1Click:Connect(function()
+                if SelectedTargets[player.Name] then
+                    SelectedTargets[player.Name] = nil
+                    Checkmark.Visible = false
+                else
+                    SelectedTargets[player.Name] = player.Name
+                    Checkmark.Visible = true
+                end
+                UpdateStatus()
+            end)
+            
+            PlayerCheckboxes[player.Name] = {
+                Entry = PlayerEntry,
+                Checkmark = Checkmark
+            }
+        end
+    end
+    PlayerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 10)
+end
+
+StateToggleButton.MouseButton1Click:Connect(function()
+    loopActive = not loopActive
+    if loopActive then
+        TweenService:Create(StateToggleButton, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(0, 180, 110)}):Play()
+        Message("Ativado", "Executando automacoes nos alvos.", 2)
+    else
+        TweenService:Create(StateToggleButton, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(230, 50, 80)}):Play()
+        Message("Parado", "Loops cancelados com sucesso.", 2)
+    end
+    UpdateStatus()
+end)
+
+DeselectAllButton.MouseButton1Click:Connect(function()
+    table.clear(SelectedTargets)
+    for _, boxData in pairs(PlayerCheckboxes) do
+        if boxData.Checkmark then boxData.Checkmark.Visible = false end
+    end
+    UpdateStatus()
+end)
+
+-- Mecânicas de Busca das Ferramentas
+local function getWeapon()
+    local char = Player.Character
+    if char and char:FindFirstChild("Kawaii Revolver") then return char:FindFirstChild("Kawaii Revolver") end
+    if Player.Backpack:FindFirstChild("Kawaii Revolver") then return Player.Backpack:FindFirstChild("Kawaii Revolver") end
+    return nil
+end
+
+local function isHoldingWeapon()
+    local char = Player.Character
+    if char and char:FindFirstChild("Kawaii Revolver") then
+        if not canShoot and tick() - lastShot < 0.05 then return false end
+        return true
+    end
+    return false
+end
+
+local function getPencilWeapon()
+    local char = Player.Character
+    if char and char:FindFirstChild("Pencil") then return char:FindFirstChild("Pencil") end
+    if Player.Backpack:FindFirstChild("Pencil") then return Player.Backpack:FindFirstChild("Pencil") end
+    return nil
+end
+
+local function isHoldingPencil()
+    local char = Player.Character
+    if char and char:FindFirstChild("Pencil") then
+        if not canShootPencil and tick() - lastPencilShot < 0.05 then return false end
+        return true
+    end
+    return false
+end
+
+local function verificarAlvoValido(playerName)
+    local targetPlayer = Players:FindFirstChild(playerName)
+    if not targetPlayer then return nil, nil end
+    local char = targetPlayer.Character
+    if not char then return nil, nil end
+    if char:FindFirstChildOfClass("ForceField") then return nil, nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum and hum.Health > 0 then
+        return targetPlayer, hum
+    end
+    return nil, nil
+end
+
+local function ForcarBotaoPencil()
+    local function getButton()
+        local playerGui = Player:WaitForChild("PlayerGui", 2)
+        if not playerGui then return nil end
+        local menuScreen = playerGui:FindFirstChild("Menu Screen")
+        local frame = menuScreen and menuScreen:FindFirstChild("Frame")
+        local scrollingFrame = frame and frame:FindFirstChild("ScrollingFrame")
+        return scrollingFrame and scrollingFrame:FindFirstChild("Pencil")
+    end
+    local function makeVisible(object)
+        while object and object:IsA("GuiObject") do
+            object.Visible = true
+            object = object.Parent
+        end
+    end
+    local btn = getButton()
+    if btn and btn.Parent then
+        makeVisible(btn)
+        if getconnections then
+            for _, connection in pairs(getconnections(btn.MouseButton1Click)) do
+                pcall(function() connection:Fire() end)
+            end
+        end
+    end
+end
+
+-- Mecânica de Fling
+local function ExecutarFling(TargetPlayer)
+    local Character = Player.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+    local TCharacter = TargetPlayer.Character
+    if not TCharacter then return end
+    
+    local THumanoid, TRootPart, THead, Accessory, Handle
+    if TCharacter:FindFirstChildOfClass("Humanoid") then THumanoid = TCharacter:FindFirstChildOfClass("Humanoid") end
+    if THumanoid and THumanoid.RootPart then TRootPart = THumanoid.RootPart end
+    if TCharacter:FindFirstChild("Head") then THead = TCharacter.Head end
+    if TCharacter:FindFirstChildOfClass("Accessory") then Accessory = TCharacter:FindFirstChildOfClass("Accessory") end
+    if Accessory and Accessory:FindFirstChild("Handle") then Handle = Accessory.Handle end
+    
+    if Character and Humanoid and RootPart then
+        if RootPart.Velocity.Magnitude < 50 then getgenv().OldPos = RootPart.CFrame end
+        if THumanoid and THumanoid.Sit then return end
+        
+        if THead then workspace.CurrentCamera.CameraSubject = THead
+        elseif Handle then workspace.CurrentCamera.CameraSubject = Handle
+        elseif THumanoid and TRootPart then workspace.CurrentCamera.CameraSubject = THumanoid end
+        
+        if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
+        
+        local FPos = function(BasePart, Pos, Ang)
+            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+            Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        end
+        
+        local SFBasePart = function(BasePart)
+            local TimeToWait = 1.5 
+            local Time = tick()
+            local Angle = 0
+            repeat
+                if RootPart and THumanoid then
+                    if BasePart.Velocity.Magnitude < 50 then
+                        Angle = Angle + 100
+                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                    else
+                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
+                        task.wait()
+                    end
+                end
+            until Time + TimeToWait < tick() or not loopActive
+        end
+        
+        workspace.FallenPartsDestroyHeight = 0/0
+        
+        local BV = Instance.new("BodyVelocity")
+        BV.Parent = RootPart
+        BV.Velocity = Vector3.new(0, 0, 0)
+        BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        
+        if TRootPart then SFBasePart(TRootPart)
+        elseif THead then SFBasePart(THead)
+        elseif Handle then SFBasePart(Handle) end
+        
+        BV:Destroy()
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        workspace.CurrentCamera.CameraSubject = Humanoid
+        
+        if getgenv().OldPos then
+            repeat
+                RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+                Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
+                Humanoid:ChangeState("GettingUp")
+                for _, part in pairs(Character:GetChildren()) do
+                    if part:IsA("BasePart") then part.Velocity, part.RotVelocity = Vector3.new(), Vector3.new() end
+                end
+                task.wait()
+            until (RootPart.Position - getgenv().OldPos.Position).Magnitude < 25
+            workspace.FallenPartsDestroyHeight = getgenv().FPDH
+        end
+    end
+end
+
+-- Loops de Execução em Segundo Plano
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if loopActive then
+            for playerName, _ in pairs(SelectedTargets) do
+                if not loopActive then break end
+                local target, _ = verificarAlvoValido(playerName)
+                if target then ExecutarFling(target) end
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not loopActive or not canShoot then return end
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local weapon = getWeapon()
+    local agora = tick()
+    
+    if not weapon then
+        ForcarBotaoPencil()
+        lastShot = agora
+        return 
+    end
+    
+    local cooldownAtual = cooldown
+    if isHoldingWeapon() then cooldownAtual = cooldown + 1.0 end
+    
+    if agora - lastShot >= cooldownAtual then
+        for playerName, _ in pairs(SelectedTargets) do
+            local target, hum = verificarAlvoValido(playerName)
+            if target and hum then
+                local remote = weapon:FindFirstChild("DamageRemote")
+                if remote then
+                    canShoot = false
+                    lastShot = agora
+                    pcall(function()
+                        weapon.Parent = char
+                        remote:FireServer(hum)
+                        weapon.Parent = Player.Backpack
+                    end)
+                    canShoot = true
+                    break 
+                end
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not loopActive or not canShootPencil then return end
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local pencilWeapon = getPencilWeapon()
+    local agora = tick()
+    
+    if not pencilWeapon then
+        ForcarBotaoPencil()
+        lastPencilShot = agora
+        return 
+    end
+    
+    local cooldownAtual = pencilCooldown
+    if isHoldingPencil() then cooldownAtual = pencilCooldown + 0.1 end
+    
+    if agora - lastPencilShot >= cooldownAtual then
+        for playerName, _ in pairs(SelectedTargets) do
+            local target, hum = verificarAlvoValido(playerName)
+            if target and hum then
+                local remote = pencilWeapon:FindFirstChild("DamageRemote") or pencilWeapon:FindFirstChildWhichIsA("RemoteEvent")
+                if remote then
+                    canShootPencil = false
+                    lastPencilShot = agora
+                    pcall(function()
+                        pencilWeapon.Parent = char
+                        remote:FireServer(hum)
+                        pencilWeapon.Parent = Player.Backpack
+                    end)
+                    canShootPencil = true
+                    break 
+                end
+            end
+        end
+    end
+end)
+
+Players.PlayerAdded:Connect(function() task.wait(0.5) RefreshPlayerList() end)
+Players.PlayerRemoving:Connect(function() task.wait(0.5) RefreshPlayerList() end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    loopActive = false
+    ScreenGui:Destroy()
+end)
+
+RefreshPlayerList()
+UpdateStatus()
+
